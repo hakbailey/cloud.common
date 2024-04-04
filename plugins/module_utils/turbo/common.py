@@ -103,10 +103,8 @@ class AnsibleTurboSocket:
         try:
             result = json.loads(raw_answer.decode())
             return result
-        except json.decoder.JSONDecodeError:
-            raise EmbeddedModuleUnexpectedFailure(
-                f"Cannot decode plugin answer: {raw_answer}"
-            )
+        except json.decoder.JSONDecodeError as e:
+            raise EmbeddedModuleUnexpectedFailure(f"Cannot decode plugin answer: {raw_answer}") from e
 
     def close(self):
         if self._socket:

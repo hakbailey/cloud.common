@@ -332,6 +332,23 @@ class AnsibleVMwareTurboMode:
             self.stop()
 
     async def handle(self, reader, writer):
+
+        def _terminate(result, plugin_type):
+            try:
+                response = json.dumps(result).encode()
+
+            except Exception as e:
+                error = None
+                message = f"Exception encountered parsing result {str(result)}. Error: {traceback.format_stack() + [str(e)]}"
+                if plugin_type == "module":
+                    error = {"msg": message, "failed": True}
+                elif plugin_type == "lookup":
+                    error = [[""], message]
+                response = json.dumps(error).encode()
+
+            writer.write(response)
+            writer.close()
+
         result = None
         self._watcher.cancel()
         self._watcher = self.loop.create_task(self.ghost_killer())
@@ -344,15 +361,19 @@ class AnsibleVMwareTurboMode:
 
         (plugin_type, content) = pickle.loads(raw_data)
 
-        def _terminate(result):
-            writer.write(json.dumps(result).encode())
-            writer.close()
-
         if plugin_type == "module":
-            result = await run_as_module(content, debug_mode=self.debug_mode)
+            try:
+                result = await run_as_module(content, debug_mode=self.debug_mode)
+            except Exception as e:
+                _terminate({"msg": f"Uncaught exception while trying to run module in TurboMode. Error: {e}. Stacktrace: {traceback.format_stack() + [str(e)]}", "failed": True}, plugin_type)
+
         elif plugin_type == "lookup":
-            result = await run_as_lookup_plugin(content)
-        _terminate(result)
+            try:
+                result = await run_as_lookup_plugin(content)
+            except Exception as e:
+                _terminate([None, f"Uncaught exception while trying to run lookup plugin in TurboMode. Error: {e}. Stacktrace: {traceback.format_stack() + [str(e)]}"], plugin_type)
+
+        _terminate(result, plugin_type)
         del self.jobs_ongoing[job_id]
 
     def handle_exception(self, loop, context):
