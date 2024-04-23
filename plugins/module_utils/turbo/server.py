@@ -59,6 +59,8 @@ def fork_process():
     This function performs the double fork process to detach from the
     parent process and execute.
     """
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write("\nRunning common.plugins.module_utils.turbo.server.fork_process()\n")
     pid = os.fork()
 
     if pid == 0:
@@ -89,6 +91,8 @@ def fork_process():
             sys.exit(0)  # pylint: disable=ansible-bad-function
     else:
         sys.exit(0)  # pylint: disable=ansible-bad-function
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write(f"  common.plugins.module_utils.turbo.server.fork_process(): Returning forked process pid: {pid}\n")
     return pid
 
 
@@ -221,6 +225,8 @@ class EmbeddedModule:
 
 
 async def run_as_lookup_plugin(data):
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write("\nRunning common.plugins.module_utils.turbo.server.run_as_lookup_plugin()\n")
     errors = None
     result = None
 
@@ -230,6 +236,8 @@ async def run_as_lookup_plugin(data):
         from ansible.parsing.dataloader import DataLoader
         from ansible.template import Templar
     except ImportError as e:
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): ImportError: {e}\n")
         errors = str(e)
         return [result, errors]
 
@@ -250,18 +258,38 @@ async def run_as_lookup_plugin(data):
         if ansible_plugins_lookup in lookup_name:
             lookup_name = lookup_name.replace(ansible_plugins_lookup, ".", 1)
 
-        instance = plugin_loader.lookup_loader.get(
-            name=lookup_name, loader=templar._loader, templar=templar
-        )
+        instance = plugin_loader.lookup_loader.get(name=lookup_name, loader=templar._loader, templar=templar)
+
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Loaded plugin named: {lookup_name}\n"
+            )
 
         if not hasattr(instance, "_run"):
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(
+                    f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Plugin  {lookup_name} has no `_run()` function, returning [None, 'No _run() found']\n"
+                )
             return [None, "No _run() found"]
         if inspect.iscoroutinefunction(instance._run):
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Awaiting {lookup_name}._run()\n")
             result = await instance._run(terms, variables=variables, **kwargs)
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Continuing after awaiting {lookup_name}._run()\n")
         else:
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"\n  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Calling {lookup_name}._run()\n")
             result = instance._run(terms, variables=variables, **kwargs)
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"\n  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Continuing after calling {lookup_name}._run()\n")
     except Exception as e:
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(f"\n  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Encountered exception: {e}\n")
         errors = to_native(e)
+
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write(f"  common.plugins.module_utils.turbo.server.run_as_lookup_plugin(): Returning {[result, errors]}\n")
 
     return [result, errors]
 
@@ -313,27 +341,56 @@ async def run_as_module(content, debug_mode):
 
 class AnsibleVMwareTurboMode:
     def __init__(self):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\nInitializing common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode as server\n")
         self.sessions = collections.defaultdict(dict)
         self.socket_path = None
         self.ttl = None
         self.debug_mode = None
         self.jobs_ongoing = {}
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode: Initialized, returning to caller\n")
 
     async def ghost_killer(self):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\nRunning common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer()\n")
         while True:
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer() awaiting sleep({self.ttl})\n")
             await asyncio.sleep(self.ttl)
-            running_jobs = {
-                job_id: start_date
-                for job_id, start_date in self.jobs_ongoing.items()
-                if (datetime.now() - start_date).total_seconds() < 3600
-            }
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write("  \ncommon.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer() continuing after await\n")
+            running_jobs = {job_id: start_date for job_id, start_date in self.jobs_ongoing.items() if (datetime.now() - start_date).total_seconds() < 10}
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer(): running jobs: {running_jobs}\n")
             if running_jobs:
+                with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                    fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer(): running while True loop again\n")
                 continue
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(
+                    "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer(): no running jobs, calling AnsibleVMwareTurboMode.stop()\n"
+                )
             self.stop()
 
     async def handle(self, reader, writer):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                "\nRunning common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle() with args:\n"
+                f"  reader: {reader}\n"
+                f"  writer: {writer}\n"
+                f"\nCurrent process pid: {os.getpid()}\n"
+            )
+
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start(): Thread ID: {self.loop._thread_id}\n"
+                f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start(): PID: {os.getpid()}\n"
+            )
 
         def _terminate(result, plugin_type):
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write("\nRunning internatl common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle()._terminate()\n")
             try:
                 response = json.dumps(result).encode()
 
@@ -347,44 +404,107 @@ class AnsibleVMwareTurboMode:
                 response = json.dumps(error).encode()
 
             writer.write(response)
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(
+                    f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle()._terminate(): Wrote result to reader: {json.dumps(result)}\n"
+                )
             writer.close()
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle()._terminate(): Writer closed\n")
 
         result = None
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Canceling running ghost_killer() task\n")
         self._watcher.cancel()
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Creating loop task common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer()\n"
+            )
         self._watcher = self.loop.create_task(self.ghost_killer())
         job_id = str(uuid.uuid4())
         self.jobs_ongoing[job_id] = datetime.now()
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Added job_id {job_id} to ongoing jobs\n"
+                f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Awaiting reader.read()\n"
+            )
+
         raw_data = await reader.read()
 
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  \ncommon.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle() Continuing after awaiting reader.read()\n")
+
         if not raw_data:
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): No raw data, returning\n")
             return
 
         (plugin_type, content) = pickle.loads(raw_data)
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): plugin_type: {plugin_type}\n"
+            )
 
         if plugin_type == "module":
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(
+                    "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Awaiting common.plugins.module_utils.turbo.server.run_as_module()\n"
+                )
             try:
                 result = await run_as_module(content, debug_mode=self.debug_mode)
+                with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                    fd.write(
+                        "\n  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Continuing after awaiting common.plugins.module_utils.turbo.server.run_as_module()\n"
+                    )
             except Exception as e:
                 _terminate({"msg": f"Uncaught exception while trying to run module in TurboMode. Error: {e}. Stacktrace: {traceback.format_stack() + [str(e)]}", "failed": True}, plugin_type)
 
         elif plugin_type == "lookup":
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write(
+                    "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Awaiting common.plugins.module_utils.turbo.server.run_as_lookup_plugin()\n"
+                )
             try:
                 result = await run_as_lookup_plugin(content)
+                with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                    fd.write(
+                        "\n  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Continuing after awaiting common.plugins.module_utils.turbo.server.run_as_lookup_plugin()\n"
+                    )
             except Exception as e:
+                with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                    fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Calling internal _terminate()\n")
+
                 _terminate([None, f"Uncaught exception while trying to run lookup plugin in TurboMode. Error: {e}. Stacktrace: {traceback.format_stack() + [str(e)]}"], plugin_type)
 
         _terminate(result, plugin_type)
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\n  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Continuing after calling internal _terminate()\n")
         del self.jobs_ongoing[job_id]
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle(): Deleted job {job_id} from ongoing jobs\n")
 
     def handle_exception(self, loop, context):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\nRunning common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle_exception()\n")
         e = context.get("exception")
         traceback.print_exception(type(e), e, e.__traceback__)
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(f"  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle_exception(): Exception: {e}\n")
+            fd.write(
+                "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle_exception(): Calling common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.stop()\n"
+            )
         self.stop()
 
     def start(self):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\nRunning common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start()\n")
         self.loop = asyncio.get_event_loop()
         self.loop.add_signal_handler(signal.SIGTERM, self.stop)
         self.loop.set_exception_handler(self.handle_exception)
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start(): Creating loop task common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.ghost_killer()\n"
+            )
         self._watcher = self.loop.create_task(self.ghost_killer())
 
         import sys
@@ -392,11 +512,17 @@ class AnsibleVMwareTurboMode:
         try:
             from ansible.plugins.loader import init_plugin_loader
 
+            with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+                fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start(): Calling ansible.plugins.loader.init_plugin_loader()\n")
             init_plugin_loader()
         except ImportError:
             # Running on Ansible < 2.15
             pass
 
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write(
+                "  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.start(): Creating loop task asyncio.start_unix_server with callable common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.handle()\n"
+            )
         if sys.hexversion >= 0x30A00B1:
             # py3.10 drops the loop argument of create_task.
             self.loop.create_task(
@@ -411,11 +537,19 @@ class AnsibleVMwareTurboMode:
         self.loop.run_forever()
 
     def stop(self):
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("\nRunning common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.stop()\n")
         os.unlink(self.socket_path)
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.stop(): socket path unlinked\n")
         self.loop.stop()
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  common.plugins.module_utils.turbo.server.AnsibleVMwareTurboMode.stop(): loop stopped\n")
 
 
 if __name__ == "__main__":
+    with open("/tmp/turbo-server-logs.txt", "w+") as fd:
+        fd.write("Running common.plugins.module_utils.turbo.server().main()\n")
     parser = argparse.ArgumentParser(description="Start a background daemon.")
     parser.add_argument("--socket-path")
     parser.add_argument("--ttl", default=15, type=int)
@@ -423,12 +557,25 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.fork:
+        with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+            fd.write("  common.plugins.module_utils.turbo.server().main: Calling common.plugins.module_utils.turbo.server().fork_process()\n")
         fork_process()
     sys_path_lock = asyncio.Lock()
     env_lock = asyncio.Lock()
 
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write("  \ncommon.plugins.module_utils.turbo.server().main: Initializing AnsibleVMwareTurboMode()\n")
     server = AnsibleVMwareTurboMode()
     server.socket_path = args.socket_path
     server.ttl = args.ttl
-    server.debug_mode = not args.fork
+    server.debug_mode = True
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write(
+            "\n  common.plugins.module_utils.turbo.server().main: AnsibleVMwareTurboMode() attributes updated to:\n"
+            f"    socket_path: {server.socket_path}\n"
+            f"    ttl: {server.ttl}\n"
+            f"    debug_mode: {server.debug_mode}\n"
+        )
+    with open("/tmp/turbo-server-logs.txt", "a+") as fd:
+        fd.write("  common.plugins.module_utils.turbo.server().main: Calling AnsibleVMWareTurboMode.start()\n")
     server.start()
